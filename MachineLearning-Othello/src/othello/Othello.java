@@ -16,6 +16,8 @@ public class Othello {
 	private Vector<int[][]> playBoards;
 	
 	public Othello(OMap oMap) {this.oMap = oMap;}
+	
+	// Getter & Setter
 	public Vector<Point> getPossiblePoints() {return possiblePoints;}
 	public void setPossiblePoints(Vector<Point> possiblePoints) {this.possiblePoints = possiblePoints;}
 	public int[][] getMap() {return this.copyMap(map);}
