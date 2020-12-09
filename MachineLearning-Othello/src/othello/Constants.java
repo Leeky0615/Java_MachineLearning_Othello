@@ -3,16 +3,6 @@ package othello;
 
 public class Constants {
 	public enum EStone{Black,White}
-//	public enum EState{
-//		NW,
-//		NN,
-//		NE,
-//		EE,
-//		ES,
-//		SS,
-//		SW,
-//		WW
-//	}
 	public enum EState{
 		NW(-1,-1),
 		NN(0,-1),
@@ -30,7 +20,5 @@ public class Constants {
 		}
 		public int getX() {return this.x;}
 		public int getY() {return this.y;}
-		
 	}
-	
 }
