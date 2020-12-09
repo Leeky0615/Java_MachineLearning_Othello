@@ -12,7 +12,6 @@ public class Othello {
 	private EStone otherS;
 	private OMap oMap;
 	private int[][] map;
-	private Vector<Point> availablechangePs;
 	private Vector<Point> possiblePoints;
 	private Vector<int[][]> playBoards;
 	
@@ -24,19 +23,20 @@ public class Othello {
 	public EStone getOtherS() {return otherS;}
 	public void setOtherS(EStone otherS) {this.otherS = otherS;}
 	public EStone getCurrentS() {return currentS;}
-	public Vector<Point> getAvailablechangePs() {return availablechangePs;}
-	public void setAvailablechangePs(Vector<Point> availablechangePs) {this.availablechangePs = availablechangePs;}
-
+	public int getPlaytime() {return playtime;}
+	public void setPlaytime(int playtime) {this.playtime = playtime;}
+	public Vector<int[][]> getPlayBoards() {return playBoards;}
+	public void setPlayBoards(Vector<int[][]> playBoards) {this.playBoards = playBoards;}
 	
 	public void init() {
 		this.currentS = EStone.Black;
 		this.otherS = EStone.White;
 		this.oMap.init();
 		this.map = oMap.getMap();
-		this.availablechangePs = new Vector<Point>();
 		this.possiblePoints = new Vector<Point>();
-		this.playBoards = new Vector<int[][]>();
+		this.playBoards = new Vector<int[][]>(10);
 		this.playBoards.add(copyMap(this.map));
+		this.playtime = 0;
 	}
 	public int[][] copyMap(int[][] map){
 		int[][] copyMap = new int[map.length][map[0].length];
@@ -47,13 +47,10 @@ public class Othello {
 	}
 		
 	// 놓는 돌의 색 초기화
-	public void setCurrentS(EStone eStone) {
+	public void setCurrentS() {
+		EStone temp = this.otherS;
 		this.otherS = currentS;
-		this.currentS = eStone;
-	}
-	// 벡터 초기화
-	private void clearVector() {
-		this.availablechangePs = new Vector<Point>();
+		this.currentS = temp;
 	}
 	// 놓는 자리가 빈 공간인지 확인.
 	public Boolean isEmpty(Point p) {
@@ -72,138 +69,198 @@ public class Othello {
 		return EStone.values()[this.map[p.x][p.y]];
 	}
 	// 놓는 자리의 주변에 놓을 수 있는 포인트들 담기(주변에 다른색의 돌만 있으면 가능) -> 1차 확인
-	public Vector<Point> possibleSurroundingP(Point currentP) {
+	public Vector<Point> possibleSurroundingP(Point cP) {
 		// 새로 놓는 자리에 8방향의 포인트 넣기
 		Vector<Point> points = new Vector<Point>();
 		for(EState eState: EState.values()) {
-			Point newP = new Point(currentP.x + eState.getX(), currentP.y + eState.getY());
+			Point newP = new Point(cP.x + eState.getX(), cP.y + eState.getY());
 			// 끝 값들은 제외 && 현재 놓는 돌의 색과 다르면 벡터에 널기
-			if(isInMap(newP) && !isEmpty(newP) && map[newP.x][newP.y] == this.otherS.ordinal()){
+			if(isInMap(newP) && !isEmpty(newP) && getStoneColor(newP) == this.otherS){
 				points.add(newP);
 			}
 		}
 		return points;
 	}
-	
-	public void addPoint(Point currentP, Point psP) {
-		Point ptoCheck = new Point((2*psP.x)-currentP.x, (2*psP.y)-currentP.y);
-		if(isInMap(ptoCheck)&& !isEmpty(ptoCheck)) {
-			// 놓는 돌이랑 같이 뒤집혀 질 수 있는 반대편의 돌들을 벡터에 담음. 
-			if(this.getStoneColor(ptoCheck) == this.currentS) this.availablechangePs.add(ptoCheck);
-			else addPoint(psP, ptoCheck);
-		}
+	// 1차 확인된 돌을 중심으로 대칭되는 돌이 놓으려고하는 돌과 같은지 비교해 돌을 놓았을 때 뒤집힐 수 있는 대칭되는 돌을 담음.
+	public Vector<Point> variableEndPoints(Point cP) {
+		try {
+			Vector<Point> availablechangePs = new Vector<Point>();
+			Vector<Point> psPs = possibleSurroundingP(cP);
+			for(Point psP : psPs) {addPoint(availablechangePs,cP,psP);}
+			return availablechangePs;
+		}catch (ArrayIndexOutOfBoundsException e) {return null;}
 	}
 	
-	// 1차 확인된 돌을 중심으로 대칭되는 돌이 놓으려고하는 돌과 같은지 비교해 돌을 놓았을 때 뒤집힐 수 있는 대칭되는 돌을 담음.
-	public void possiblesPoints(Point currentP) {
-		try {
-			Vector<Point> psPs = possibleSurroundingP(currentP);
-			for(Point psP : psPs) {addPoint(currentP,psP);}
-		}catch (ArrayIndexOutOfBoundsException e) {}
+	public void addPoint(Vector<Point> vePVector, Point cP, Point veP) {
+		Point ptoCheck = new Point((2*veP.x)-cP.x, (2*veP.y)-cP.y);
+		if(isInMap(ptoCheck) && !isEmpty(ptoCheck)) {
+			// 놓는 돌이랑 같이 뒤집혀 질 수 있는 반대편의 돌들을 벡터에 담음. 
+			if(this.getStoneColor(ptoCheck) == this.currentS) vePVector.add(ptoCheck);
+			else addPoint(vePVector, veP, ptoCheck);
+		}
+	}
+	// 뒤집을 수 있는 포인트인지 확인하는 함수
+	public Boolean checkStone(Point cP) {
+		if (isEmpty(cP)) {
+			if(this.variableEndPoints(cP).size() != 0) {
+				this.possiblePoints.add(cP);
+				return true;
+			}else {return false;}
+		}else {return false;}
 	}
 	
 	// 돌 뒤집기.
-	private void changeStones(Point p) {
-		for(Point oppsiteP : this.availablechangePs) {
-			if(oppsiteP.x == p.x) {
-				for (int i = Math.min(oppsiteP.y, p.y); i <= Math.max(oppsiteP.y, p.y); i++) {
-					this.map[p.x][i] = this.currentS.ordinal();
+	private void changeStones(Vector<Point> vePVector, Point cP) {
+		for(Point veP : vePVector) {
+			if(veP.x == cP.x) { // 세로
+				for (int i = Math.min(veP.y, cP.y); i <= Math.max(veP.y, cP.y); i++) {
+					this.map[cP.x][i] = this.currentS.ordinal();
 				}
-			}else if(oppsiteP.y == p.y) {
-				for (int i = Math.min(oppsiteP.x, p.x); i <= Math.max(oppsiteP.x, p.x); i++) {
-					this.map[i][p.y] = this.currentS.ordinal();
+			}else if(veP.y == cP.y) { // 가로
+				for (int i = Math.min(veP.x, cP.x); i <= Math.max(veP.x, cP.x); i++) {
+					this.map[i][cP.y] = this.currentS.ordinal();
 				}
-			}else {
-				int x = Math.min(oppsiteP.x, p.x);
+			}else { // 대각선
+				int x = Math.min(veP.x, cP.x);
 				int y;
 				EState state;
-				if(oppsiteP.x == x) {
-					y = oppsiteP.y;
-					if(y<p.y) state = EState.ES;
+				// 방향설정
+				if(veP.x == x) {
+					y = veP.y;
+					if(y < cP.y) state = EState.ES;
 					else state = EState.NW;
 				}else {
-					y = p.y;
-					if(y<oppsiteP.y) state = EState.ES;
+					y = cP.y;
+					if(y < veP.y) state = EState.ES;
 					else state = EState.NW;
 				}
-				for (int i = x; i <= Math.max(oppsiteP.x, p.x); i++) {
-					if(state == EState.ES) {
+				// 뒤집기
+				if (state == EState.ES) {
+					for (int i = x; i <= Math.max(veP.x, cP.x); i++) {
 						this.map[i][y++] = this.currentS.ordinal();
-					}else if(state == EState.NW) {
+					}
+				}else if(state == EState.NW) {
+					for (int i = x; i <= Math.max(veP.x, cP.x); i++) {
 						this.map[i][y--] = this.currentS.ordinal();
 					}
 				}
 			}
 		}
 	}
-	public Boolean checkStone(Point p) {
-		// 놓는 곳이 빈곳이면
-		if (isEmpty(p)) {
-			// 
-			this.possiblesPoints(p);
-			if(this.availablechangePs.size() != 0) {
-				this.possiblePoints.add(p);
-				return true;
-			}else {
-				return false;
-			}
+	
+	// 포인트에 돌을 놓는 함수
+	public void putStone(Point cP) {
+		if (this.variableEndPoints(cP).size() == 0) {
+			System.out.println("놓을 수 없는 자리입니다.");
 		}else {
-			return false;
+			this.changeStones(this.variableEndPoints(cP), cP); // 돌 뒤집기
+			this.possiblePoints = new Vector<Point>(); // 가능한 점 초기화
+			this.setCurrentS(); // 플레이어 변경
+			this.playtime++;
+			this.playBoards.add(this.playtime,this.copyMap(this.map));
 		}
 	}
-
-	public void putStone(Point p) {
-		this.possiblesPoints(p);
-		this.changeStones(p);
-		this.drawMap();
-		this.clearVector();
-		this.possiblePoints = new Vector<Point>();
-		this.setCurrentS(this.otherS);
-	}
 	
-	public void countPoints() {
+	// 점수 계산 함수.
+	public int countPoints() {
 		int point = 0;
 		for (int i = 0; i < 8; i++) {
 			for (int j = 0; j < 8; j++) {
-				if(this.currentS == EStone.Black) {
-					if(this.map[j][i]==EStone.Black.ordinal()) point++;
-					else if(this.map[j][i]==EStone.White.ordinal()) point--;
+				if (this.currentS == EStone.Black) {
+					if (this.map[j][i] == EStone.Black.ordinal()) point++; // 좌표의 돌이 '흑'이면 +1
+					else if(this.map[j][i] == EStone.White.ordinal()) point--; // 좌표의 돌이 '백'이면 -1
 				}else {
-					if(this.map[j][i]==EStone.Black.ordinal()) point--;
-					else if(this.map[j][i]==EStone.White.ordinal()) point++;
+					if (this.map[j][i] == EStone.Black.ordinal()) point--; // 좌표의 돌이 '흑'이면 +1
+					else if(this.map[j][i] == EStone.White.ordinal()) point++; // 좌표의 돌이 '백'이면 -1
 				}
 			}
 		}
-		System.out.println("점수: "+point);
+		return point;
+	}
+
+	public void countStone() {
+		int black = 0;
+		int white = 0;
+		for (int i = 0; i < 8; i++) {
+			for (int j = 0; j < 8; j++) {
+				if (this.currentS == EStone.Black)	black++;
+				else white++;
+			}
+		}
+		System.out.println("흑 : "+black+"개 // 백 : "+white+"개");
 	}
 	
+	
+	// 변환 가능한 점을 찾는 함수.
 	public void findPossible() {
-		int[][] originMap = copyMap(this.map);
-		for (int i = 0; i < map.length; i++) {
-			for (int j = 0; j < map.length; j++) {
+		System.out.println("---------확인 결과----------");
+		int[][] currentMap = this.playBoards.get(this.playtime);
+		this.possiblePoints = new Vector<Point>();
+		for (int i = 0; i < currentMap.length; i++) {
+			for (int j = 0; j < currentMap[i].length; j++) {
 				Point p = new Point(j, i);
 				if(checkStone(p)) {
 					System.out.print("좌표: (" + j + ", " + i + ") / ");
-					this.changeStones(p);
-					this.countPoints();
-					System.out.println("- - - - - - - - - - - - -");
-					this.map = copyMap(originMap);
-					this.clearVector();
+					this.changeStones(this.variableEndPoints(p),p);
+					System.out.println("점수 : "+this.countPoints()+"점");
+					this.map = copyMap(currentMap);
 				}
 			}
 		}
-		System.out.println("놓을 수 있는 포인트 개수  : " + this.possiblePoints.size());
+		System.out.println("놓을 수 있는 위치  : " + this.possiblePoints.size() +"개");
 		if (this.possiblePoints.size() == 0) {
-			this.setCurrentS(this.otherS);
+			if (checkEnd(currentMap)) {
+				this.setCurrentS();
+				System.out.println("뒤집을 수 있는 돌이 없어 플레이어를 변경합니다.");
+			}else {
+				System.out.println("======게임 종료======");
+				countStone();
+			}
 		}
 	}
+	public Boolean checkEnd(int[][] currentMap) {
+		int empty = 0;
+		for (int i = 0; i < currentMap.length; i++) {
+			for (int j = 0; j < currentMap.length; j++) {
+				if(currentMap[j][i] == 2) empty++;
+			}
+		}
+		if (empty == 0) return false;
+		else return true;
+	}
+	public void checkNextNode() {
+		for(Point pP : this.getPossiblePoints()) {
+			this.putStone(pP);
+			System.out.println("==================================");
+			System.out.print("====> 플레이 타임: "+ this.playtime+" //");
+			System.out.println("확인좌표: (" + pP.x + ", " + pP.y + ")");
+			this.drawMap();
+			this.findPossible();
+			this.setCurrentS();
+			this.playtime--;
+			this.map = copyMap(this.getPlayBoards().get(this.playtime));
+		}
+	}
+
 	public void drawMap() {
-		int[][] originMap = this.map;
-		for (int i = 0; i < originMap.length; i++) {
-			for (int j = 0; j < originMap.length; j++) {
-				System.out.print(originMap[j][i]);
-				}
-			System.out.println();
+		int[][] currentMap = this.playBoards.get(this.playtime);
+		int numY = 0;
+		int numX = 0;
+		System.out.print("  ");
+		for (@SuppressWarnings("unused") int[] i : currentMap) {
+			System.out.print(" " + numX);
+			numX++;
+		}
+		System.out.print("\n");
+		for (int i = 0; i < currentMap.length; i++) {
+			System.out.print(numY < 10 ? numY + " " : numY);
+			numY++;
+			for (int j = 0; j < currentMap.length; j++) {
+				if (currentMap[j][i] == 0) System.out.print(" ○");
+				else if (currentMap[j][i] == 1) System.out.print(" x");
+				else System.out.print(" ●");
+			}
+			System.out.print("\n");
 		}
 	}
 }
