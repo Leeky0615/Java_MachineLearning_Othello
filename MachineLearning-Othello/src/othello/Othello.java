@@ -7,6 +7,7 @@ import othello.Constants.EState;
 import othello.Constants.EStone;
 
 public class Othello {
+	// Variable
 	private int playtime;
 	private EStone currentS;
 	private EStone otherS;
@@ -30,6 +31,7 @@ public class Othello {
 	public Vector<int[][]> getPlayBoards() {return playBoards;}
 	public void setPlayBoards(Vector<int[][]> playBoards) {this.playBoards = playBoards;}
 	
+	// Initialize 
 	public void init() {
 		this.currentS = EStone.Black;
 		this.otherS = EStone.White;
@@ -40,6 +42,7 @@ public class Othello {
 		this.playBoards.add(copyMap(this.map));
 		this.playtime = 0;
 	}
+	// Deep copy
 	public int[][] copyMap(int[][] map){
 		int[][] copyMap = new int[map.length][map[0].length];
 		for (int i = 0; i < copyMap.length; i++) {
@@ -47,7 +50,6 @@ public class Othello {
 		}
 		return copyMap;
 	}
-		
 	// 놓는 돌의 색 초기화
 	public void setCurrentS() {
 		EStone temp = this.otherS;
@@ -70,6 +72,7 @@ public class Othello {
 	public EStone getStoneColor(Point p) {
 		return EStone.values()[this.map[p.x][p.y]];
 	}
+	
 	// 놓는 자리의 주변에 놓을 수 있는 포인트들 담기(주변에 다른색의 돌만 있으면 가능) -> 1차 확인
 	public Vector<Point> possibleSurroundingP(Point cP) {
 		// 새로 놓는 자리에 8방향의 포인트 넣기
@@ -83,6 +86,7 @@ public class Othello {
 		}
 		return points;
 	}
+	
 	// 1차 확인된 돌을 중심으로 대칭되는 돌이 놓으려고하는 돌과 같은지 비교해 돌을 놓았을 때 뒤집힐 수 있는 대칭되는 돌을 담음.
 	public Vector<Point> variableEndPoints(Point cP) {
 		try {
@@ -110,7 +114,18 @@ public class Othello {
 			}else {return false;}
 		}else {return false;}
 	}
-	
+	// 포인트에 돌을 놓는 함수
+	public void putStone(Point cP) {
+		if (this.variableEndPoints(cP).size() == 0) {
+			System.out.println("놓을 수 없는 자리입니다.");
+		}else {
+			this.changeStones(this.variableEndPoints(cP), cP); // 돌 뒤집기
+			this.possiblePoints = new Vector<Point>(); // 가능한 점 초기화
+			this.setCurrentS(); // 플레이어 변경
+			this.playtime++;
+			this.playBoards.add(this.playtime,this.copyMap(this.map));
+		}
+	}
 	// 돌 뒤집기.
 	private void changeStones(Vector<Point> vePVector, Point cP) {
 		for(Point veP : vePVector) {
@@ -126,7 +141,6 @@ public class Othello {
 				int x = Math.min(veP.x, cP.x);
 				int y;
 				EState state;
-				// 방향설정
 				if(veP.x == x) {
 					y = veP.y;
 					if(y < cP.y) state = EState.ES;
@@ -136,7 +150,6 @@ public class Othello {
 					if(y < veP.y) state = EState.ES;
 					else state = EState.NW;
 				}
-				// 뒤집기
 				if (state == EState.ES) {
 					for (int i = x; i <= Math.max(veP.x, cP.x); i++) {
 						this.map[i][y++] = this.currentS.ordinal();
@@ -150,36 +163,20 @@ public class Othello {
 		}
 	}
 	
-	// 포인트에 돌을 놓는 함수
-	public void putStone(Point cP) {
-		if (this.variableEndPoints(cP).size() == 0) {
-			System.out.println("놓을 수 없는 자리입니다.");
-		}else {
-			this.changeStones(this.variableEndPoints(cP), cP); // 돌 뒤집기
-			this.possiblePoints = new Vector<Point>(); // 가능한 점 초기화
-			this.setCurrentS(); // 플레이어 변경
-			this.playtime++;
-			this.playBoards.add(this.playtime,this.copyMap(this.map));
-		}
-	}
 	
 	// 점수 계산 함수.
 	public int countPoints() {
 		int point = 0;
 		for (int i = 0; i < 8; i++) {
 			for (int j = 0; j < 8; j++) {
-				if (this.currentS == EStone.Black) {
 					if (this.map[j][i] == EStone.Black.ordinal()) point++; // 좌표의 돌이 '흑'이면 +1
 					else if(this.map[j][i] == EStone.White.ordinal()) point--; // 좌표의 돌이 '백'이면 -1
-				}else {
-					if (this.map[j][i] == EStone.Black.ordinal()) point--; // 좌표의 돌이 '흑'이면 +1
-					else if(this.map[j][i] == EStone.White.ordinal()) point++; // 좌표의 돌이 '백'이면 -1
-				}
 			}
 		}
 		return point;
 	}
-
+	
+	// 돌의 개수 확인
 	public void countStone() {
 		int black = 0;
 		int white = 0;
@@ -220,7 +217,8 @@ public class Othello {
 			}
 		}
 	}
-	public Boolean checkEnd(int[][] currentMap) {
+	
+		public Boolean checkEnd(int[][] currentMap) {
 		int empty = 0;
 		for (int i = 0; i < currentMap.length; i++) {
 			for (int j = 0; j < currentMap.length; j++) {
@@ -230,6 +228,7 @@ public class Othello {
 		if (empty == 0) return false;
 		else return true;
 	}
+		
 	public void checkNextNode() {
 		for(Point pP : this.getPossiblePoints()) {
 			this.putStone(pP);
